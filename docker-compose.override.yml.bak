@@ -1,0 +1,26 @@
+version: '3.8'
+
+services:
+  backend:
+    environment:
+      - SPRING_PROFILES_ACTIVE=development
+      - SPRING_JPA_SHOW_SQL=true
+    volumes:
+      - ./backend/src:/app/src
+    ports:
+      - "8080:8080"
+      - "5005:5005" # Debug port
+
+  frontend:
+    volumes:
+      - ./frontend/src:/app/src
+    environment:
+      - REACT_APP_API_URL=http://localhost:8080/api
+      - CHOKIDAR_USEPOLLING=true
+    command: npm start
+
+  postgres:
+    ports:
+      - "5432:5432"
+    environment:
+      - POSTGRES_DB=assignments_dev_db

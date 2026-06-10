@@ -1,0 +1,90 @@
+
+services:
+  # PostgreSQL Database
+  postgres:
+    image: postgres:15-alpine
+    container_name: assignments-postgres
+    environment:
+      POSTGRES_DB: assignments_db
+      POSTGRES_USER: assignments_user
+      POSTGRES_PASSWORD: assignments_password_2024
+      PGDATA: /var/lib/postgresql/data/pgdata
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./database/init.sql:/docker-entrypoint-initdb.d/init.sql
+    ports:
+      - "5432:5432"
+    networks:
+      - assignments-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U assignments_user -d assignments_db"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # Spring Boot Backend
+  backend:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: assignments-backend
+    environment:
+      - SPRING_PROFILES_ACTIVE=production
+      - SPRING_DATASOURCE_URL=jdbc:postgresql://postgres:5432/assignments_db
+      - SPRING_DATASOURCE_USERNAME=assignments_user
+      - SPRING_DATASOURCE_PASSWORD=assignments_password_2024
+      - SERVER_PORT=8080
+    ports:
+      - "8081:8080"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks:
+      - assignments-network
+    restart: unless-stopped
+    volumes:
+      - backend_uploads:/app/uploads
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/api/subjects"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # React Frontend
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: assignments-frontend
+    ports:
+      - "3000:80"
+    depends_on:
+      - backend
+    networks:
+     - assignments-network
+    restart: unless-stopped
+  # Nginx Reverse Proxy (Optional)
+#  nginx:
+#    image: nginx:alpine
+#    container_name: assignments-nginx
+#    ports:
+#      - "80:80"
+#      - "443:443"
+#    volumes:
+#      - ./nginx/nginx.conf:/etc/nginx/nginx.conf
+#      - ./nginx/ssl:/etc/nginx/ssl
+#    depends_on:
+#      - frontend
+#      - backend
+#    networks:
+#      - assignments-network
+#    restart: unless-stopped
+
+volumes:
+  postgres_data:
+  backend_uploads:
+
+networks:
+  assignments-network:
+    driver: bridge
